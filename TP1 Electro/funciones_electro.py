@@ -50,7 +50,7 @@ def graficar_ohm(frecuencias, magnitudes):
     ticks_y = list(range(0, max_ohm + 4, 4))   # Genera la lista [0, 4, 8, 12, 16...]
     labels_y = [f'{val} $\Omega$' for val in ticks_y] # Crea las etiquetas estéticas
     
-    plt.ylim(0, max_ohm + 2) # Le damos un pequeño margen arriba para que no corte la curva
+    plt.ylim(0, 100) # Le damos un pequeño margen arriba para que no corte la curva
     plt.yticks(ticks_y, labels_y)
     plt.ylabel('Impedancia Magnitud (|Z|)', fontsize=11)
     
@@ -80,6 +80,6 @@ def graficar_ohm(frecuencias, magnitudes):
     plt.tight_layout()
     plt.show()
 
-frecuencias1, magnitud1, fase1 = importar_datos_limp(r'C:\Users\dell_\Downloads\TP1 Electro-20260610T000342Z-3-001\TP1 Electro\Electrico\SIN MASA.csv')
+frecuencias1, magnitud1, fase1 = importar_datos_limp(r'TP1 Electro\Electrico\SIN MASA.csv')
 
 graficar_ohm(frecuencias1, magnitud1)
