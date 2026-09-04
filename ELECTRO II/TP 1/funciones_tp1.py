@@ -96,6 +96,39 @@ def graficar_respuesta_db(frec, mag_db, fase, titulo="Respuesta en Frecuencia y 
     plt.tight_layout()
     plt.show()
 
+def graficar_respuesta(frec, mag_db, fase, titulo="Máximo nivel de salida"):
+    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=False, figsize=(8, 6.5))
+    fig.suptitle(titulo, fontsize=12, fontweight="bold")
+
+    # --- SUBPLOT MAGNITUD ---
+    ax1.semilogx(frec, mag_db, label="Nivel de Presión Sonora (SPL)", color="#1f77b4")
+    ax1.set_ylabel("Magnitud [dB]")
+    ax1.grid(True, which="both", linestyle="--", alpha=0.6)
+
+    # --- SUBPLOT FASE ---
+    frec_fase, fase_proc = desacoplar_fase(frec, fase)
+    ax2.semilogx(frec_fase, fase_proc, color="orange", label="Fase")
+    ax2.set_ylabel("Fase [°]")
+    ax2.grid(True, which="both", linestyle="--", alpha=0.6)
+    ax2.set_ylim(-180, 180)
+    ax2.set_yticks([-180, -135, -90, -45, 0, 45, 90, 135, 180])
+
+    # b) Escala Y enfocada en zona de interés hasta ka=1 (994 Hz)
+    frec_arr = np.array(frec)
+    mag_db_arr = np.array(mag_db)
+    mascara_res = (frec_arr >= 20) & (frec_arr <= 994)
+    if np.any(mascara_res):
+        mag_filtrada = mag_db_arr[mascara_res]
+        margen = (np.max(mag_filtrada) - np.min(mag_filtrada)) * 0.08
+        ax1.set_ylim(np.min(mag_filtrada) - margen, np.max(mag_filtrada) + margen)
+
+    # a) Ticks, etiquetas y ka=1 en AMBOS gráficos
+    aplicar_formato_ejes(ax1)
+    aplicar_formato_ejes(ax2)
+
+    plt.tight_layout()
+    plt.show()
+
 def comparar_respuesta_db(listas_frec, listas_mag_db, listas_fase, etiquetas=None, titulo="Comparativa de Respuesta en Frecuencia y Fase"):
     num_curvas = len(listas_frec)
     if etiquetas is None:
@@ -147,14 +180,15 @@ def comparar_respuesta_db(listas_frec, listas_mag_db, listas_fase, etiquetas=Non
     plt.show()
     
 # ----- IMPORTS ------
-frec_system_response, mag_system_response, fase_system_respones = importar_basta(r"exports/system_response.txt")
-frec_driver_response, mag_driver_response, fase_driver_respones = importar_basta(r"exports/driver_response.txt")
-frec_vent_response, mag_vent_response, fase_vent_respones = importar_basta(r"exports/vent_response.txt")
-frec_electrical_impedance, mag_electrical_impedance, fase_electrical_impedance = importar_basta(r"exports/electrical_impedance.txt")
-frec_system_response_CB, mag_system_response_CB, fase_system_respones_CB = importar_basta(r"exports/system_response_CB.txt")
-frec_system_response_MODIFICADO, mag_system_response_MODIFICADO, fase_system_respones_MODIFICADO = importar_basta(r"exports/system_response_MODIFICADO.txt")
+frec_system_response, mag_system_response, fase_system_respones = importar_basta(r"ELECTRO II\TP 1\exports\system_response.txt")
+frec_driver_response, mag_driver_response, fase_driver_respones = importar_basta(r"ELECTRO II\TP 1\exports\driver_response.txt")
+frec_vent_response, mag_vent_response, fase_vent_respones = importar_basta(r"ELECTRO II\TP 1\exports\vent_response.txt")
+frec_electrical_impedance, mag_electrical_impedance, fase_electrical_impedance = importar_basta(r"ELECTRO II\TP 1\exports\electrical_impedance.txt")
+frec_system_response_CB, mag_system_response_CB, fase_system_respones_CB = importar_basta(r"ELECTRO II\TP 1\exports\system_response_CB.txt")
+frec_system_response_MODIFICADO, mag_system_response_MODIFICADO, fase_system_respones_MODIFICADO = importar_basta(r"ELECTRO II\TP 1\exports\system_response_MODIFICADO.txt")
+frec_max_level, mag_max_level, fase_max_level = importar_basta(r"ELECTRO II\TP 1\exports\level_MOL.txt")
 
-graficar_impedancia(frec_electrical_impedance, mag_electrical_impedance, fase_electrical_impedance)
+"""graficar_impedancia(frec_electrical_impedance, mag_electrical_impedance, fase_electrical_impedance)
 comparar_respuesta_db(
     listas_frec=[frec_system_response,frec_driver_response,frec_vent_response],
     listas_mag_db=[mag_system_response, mag_driver_response, mag_vent_response],
@@ -177,4 +211,63 @@ comparar_respuesta_db(
     listas_fase=[fase_system_respones,fase_system_respones_MODIFICADO],
     etiquetas=["Gabinete original", "Gabinete modificado"],
     titulo="Comparativa Respuesta en frecuencia"
-)
+)"""
+
+# COSAS LULA FORMATO DISTINTO PERDON!!!
+import numpy as np
+import matplotlib.pyplot as plt
+
+def aplicar_formato_ejes(ax):
+    # Reemplaza esto con el contenido de tu función original
+    pass
+
+def graficar_mol_tres_curvas(frec, mag_db, excursion, vent_v, titulo="Análisis de Máximo Nivel de Salida (MOL)"):
+    # Creamos 3 subplots compartiendo el eje X para comparar fácilmente
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, figsize=(8, 9))
+    fig.suptitle(titulo, fontsize=12, fontweight="bold")
+
+    # --- SUBPLOT 1: MAGNITUD (SPL) ---
+    ax1.semilogx(frec, mag_db, label="Nivel de Presión Sonora (SPL)", color="#1f77b4")
+    ax1.set_ylabel("Magnitud [dB]")
+    ax1.grid(True, which="both", linestyle="--", alpha=0.6)
+
+    # Escala Y enfocada en zona de interés hasta ka=1 (994 Hz) para Magnitud
+    frec_arr = np.array(frec)
+    mag_db_arr = np.array(mag_db)
+    mascara_res = (frec_arr >= 20) & (frec_arr <= 994)
+    if np.any(mascara_res):
+        mag_filtrada = mag_db_arr[mascara_res]
+        margen = (np.max(mag_filtrada) - np.min(mag_filtrada)) * 0.08
+        ax1.set_ylim(np.min(mag_filtrada) - margen, np.max(mag_filtrada) + margen)
+
+    # --- SUBPLOT 2: EXCURSIÓN ---
+    # Multiplicamos por 1000 para graficar en milímetros en lugar de metros
+    excursion_mm = np.array(excursion) * 1000
+    ax2.semilogx(frec, excursion_mm, color="#1f77b4")
+    ax2.set_ylabel("Excursión [mm]")
+    ax2.grid(True, which="both", linestyle="--", alpha=0.6)
+
+    # --- SUBPLOT 3: VELOCIDAD DEL PUERTO ---
+    ax3.semilogx(frec, vent_v, color="#1f77b4")
+    ax3.set_ylabel("Vel. Puerto [m/s]")
+    ax3.set_xlabel("Frecuencia [Hz]")
+    ax3.grid(True, which="both", linestyle="--", alpha=0.6)
+
+    # Aplicar formato a los tres ejes
+    aplicar_formato_ejes(ax1)
+    aplicar_formato_ejes(ax2)
+    aplicar_formato_ejes(ax3)
+
+    plt.tight_layout()
+    plt.show()
+
+# --- CARGA DE DATOS Y EJECUCIÓN ---
+# Utilizamos skiprows=1 para ignorar el encabezado de los archivos .txt
+try:
+    frec, excursion = np.loadtxt('excursion_MOL.txt', skiprows=1, unpack=True)
+    _, mag_db = np.loadtxt('level_MOL.txt', skiprows=1, unpack=True)
+    _, vent_v = np.loadtxt('vent_v_MOL.txt', skiprows=1, unpack=True)
+    
+    graficar_mol_tres_curvas(frec, mag_db, excursion, vent_v)
+except FileNotFoundError as e:
+    print(f"Error: Asegúrate de que los archivos .txt estén en la misma carpeta que este script. {e}")
