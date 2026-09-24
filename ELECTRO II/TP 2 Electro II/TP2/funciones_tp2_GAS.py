@@ -268,6 +268,62 @@ def comparar_respuesta_db(listas_frec, listas_mag_db, listas_fase=None, etiqueta
     plt.tight_layout()
     plt.show()
     
+
+def diferencia_maxima_db(frec1, mag1_db, frec2, mag2_db, f_min=20, f_max=50, f_norm=200):
+    """
+    Calcula la mayor diferencia en dB entre dos respuestas en frecuencia en un rango dado.
+    Aplica normalización a 0 dB en f_norm (por defecto 200 Hz).
+    
+    Parámetros:
+    - frec1, mag1_db: Frecuencias y magnitudes en dB de la Curva 1.
+    - frec2, mag2_db: Frecuencias y magnitudes en dB de la Curva 2.
+    - f_min, f_max: Rango de búsqueda en Hz (ej. 20 y 50 Hz).
+    - f_norm: Frecuencia de referencia para normalizar a 0 dB (ej. 200 Hz).
+    
+    Devuelve:
+    - f_max_diff: Frecuencia (Hz) donde ocurre la mayor diferencia.
+    - max_diff: Valor absoluto de la diferencia máxima en dB.
+    """
+    frec1 = np.array(frec1)
+    mag1_db = np.array(mag1_db)
+    frec2 = np.array(frec2)
+    mag2_db = np.array(mag2_db)
+    
+    # 1. Normalización a 0 dB en 200 Hz para ambas curvas
+    idx_norm1 = np.argmin(np.abs(frec1 - f_norm))
+    idx_norm2 = np.argmin(np.abs(frec2 - f_norm))
+    
+    mag1_norm = mag1_db - mag1_db[idx_norm1]
+    mag2_norm = mag2_db - mag2_db[idx_norm2]
+    
+    # 2. Filtrar la curva 1 dentro del rango [f_min, f_max]
+    mask_rango = (frec1 >= f_min) & (frec1 <= f_max)
+    
+    if not np.any(mask_rango):
+        raise ValueError(f"No hay puntos de la Curva 1 en el rango especificado ({f_min} Hz - {f_max} Hz).")
+        
+    frec1_eval = frec1[mask_rango]
+    mag1_eval = mag1_norm[mask_rango]
+    
+    # 3. Interpolar la curva 2 sobre la grilla de frecuencias de la curva 1 en ese rango
+    mag2_interp = np.interp(frec1_eval, frec2, mag2_norm)
+    
+    # 4. Diferencia punto a punto
+    diferencias = np.abs(mag1_eval - mag2_interp)
+    
+    # 5. Buscar el máximo
+    idx_max = np.argmax(diferencias)
+    
+    f_max_diff = frec1_eval[idx_max]
+    max_diff = diferencias[idx_max]
+    
+    print("--- Análisis de Diferencia Máxima ---")
+    print(f"Rango analizado: {f_min} Hz a {f_max} Hz")
+    print(f"Máxima diferencia: {max_diff:.2f} dB en {f_max_diff:.2f} Hz")
+    
+    return f_max_diff, max_diff
+
+
 # ----- IMPORTES ------
 frec_port, mag_port, fas_port = importar_arta(r"stf\stf_port.txt")
 frec_driver, mag_driver, fas_driver = importar_arta(r"stf\stf_driver.txt")
@@ -328,3 +384,38 @@ comparar_impedancias(
     label_1="Simulación BASTA",
     label_2="Medición LIMP")
     
+freq_dif1, db_dif1 = diferencia_maxima_db(
+    frec1=frec_respuesta_final, 
+    mag1_db=mag_respuesta_final, 
+    frec2=frec_system_response, 
+    mag2_db=mag_system_response, 
+    f_min=20, 
+    f_max=30
+)
+
+freq_dif2, db_dif2 = diferencia_maxima_db(
+    frec1=frec_respuesta_final, 
+    mag1_db=mag_respuesta_final, 
+    frec2=frec_system_response, 
+    mag2_db=mag_system_response, 
+    f_min=30, 
+    f_max=50
+)
+
+freq_dif3, db_dif3 = diferencia_maxima_db(
+    frec1=frec_respuesta_final, 
+    mag1_db=mag_respuesta_final, 
+    frec2=frec_system_response, 
+    mag2_db=mag_system_response, 
+    f_min=50, 
+    f_max=300
+)
+
+freq_dif4, db_dif4 = diferencia_maxima_db(
+    frec1=frec_respuesta_final, 
+    mag1_db=mag_respuesta_final, 
+    frec2=frec_system_response, 
+    mag2_db=mag_system_response, 
+    f_min=300, 
+    f_max=1000
+)
