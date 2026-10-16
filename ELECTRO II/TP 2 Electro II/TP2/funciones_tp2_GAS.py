@@ -94,7 +94,49 @@ def detectar_resonancia(frecuencias, magnitudes):
          
     return f_res, mag_res
  
+
+def combinar_fases(frecuencias, fase1, fase2, f_corte=540.0, suavizar_salto=True):
+    """
+    Combina dos vectores de fase en una frecuencia dada.
     
+    Parámetros:
+    - frecuencias: Array de frecuencias (en Hz) correspondiente a las mediciones.
+    - fase1: Array con la fase del primer método/medición (se usa para f < f_corte).
+    - fase2: Array con la fase del segundo método/medición (se usa para f >= f_corte).
+    - f_corte: Frecuencia de transición en Hz (por defecto 540 Hz).
+    - suavizar_salto: Si es True, compensa el salto de nivel para evitar un escalón en f_corte.
+    
+    Devuelve:
+    - fase_combinada: Array NumPy con la fase unificada.
+    """
+    frecuencias = np.array(frecuencias)
+    fase1 = np.array(fase1)
+    fase2 = np.array(fase2)
+    
+    # Máscara booleana para dividir en f < f_corte y f >= f_corte
+    mask_baja = frecuencias < f_corte
+    mask_alta = ~mask_baja
+    
+    fase_combinada = np.zeros_like(frecuencias)
+    
+    # Tramo de bajas frecuencias (fase 1)
+    fase_combinada[mask_baja] = fase1[mask_baja]
+    
+    if suavizar_salto and np.any(mask_baja) and np.any(mask_alta):
+        # Indice del último punto antes del corte y del primero después
+        idx_corte_baja = np.where(mask_baja)[0][-1]
+        idx_corte_alta = np.where(mask_alta)[0][0]
+        
+        # Compensamos el offset para que la curva sea continua
+        salto = fase2[idx_corte_alta] - fase1[idx_corte_baja]
+        fase_combinada[mask_alta] = fase2[mask_alta] - salto
+    else:
+        # Empalme directo (sin ajustar desfasaje)
+        fase_combinada[mask_alta] = fase2[mask_alta]
+        
+    return fase_combinada
+
+
 # --- FUNCIONES DE GRAFICACIÓN ELÉCTRICA ---
 def comparar_impedancias(frecuencias_1, mags_1, frecuencias_2, mags_2, 
                          title="Comparación de Impedancias", 
@@ -269,16 +311,17 @@ def comparar_respuesta_db(listas_frec, listas_mag_db, listas_fase=None, etiqueta
     plt.show()
     
 
-def diferencia_maxima_db(frec1, mag1_db, frec2, mag2_db, f_min=20, f_max=50, f_norm=200):
+def diferencia_maxima_db(frec1, mag1_db, frec2, mag2_db, f_min=20, f_max=50, normalizar=True, f_norm=200):
     """
     Calcula la mayor diferencia en dB entre dos respuestas en frecuencia en un rango dado.
-    Aplica normalización a 0 dB en f_norm (por defecto 200 Hz).
     
     Parámetros:
     - frec1, mag1_db: Frecuencias y magnitudes en dB de la Curva 1.
     - frec2, mag2_db: Frecuencias y magnitudes en dB de la Curva 2.
     - f_min, f_max: Rango de búsqueda en Hz (ej. 20 y 50 Hz).
-    - f_norm: Frecuencia de referencia para normalizar a 0 dB (ej. 200 Hz).
+    - normalizar: Booleano. Si es True, normaliza ambas curvas a 0 dB en f_norm. 
+                  Si es False, evalúa las magnitudes absolutas tal como vienen.
+    - f_norm: Frecuencia de referencia para normalizar (por defecto 200 Hz).
     
     Devuelve:
     - f_max_diff: Frecuencia (Hz) donde ocurre la mayor diferencia.
@@ -289,12 +332,16 @@ def diferencia_maxima_db(frec1, mag1_db, frec2, mag2_db, f_min=20, f_max=50, f_n
     frec2 = np.array(frec2)
     mag2_db = np.array(mag2_db)
     
-    # 1. Normalización a 0 dB en 200 Hz para ambas curvas
-    idx_norm1 = np.argmin(np.abs(frec1 - f_norm))
-    idx_norm2 = np.argmin(np.abs(frec2 - f_norm))
-    
-    mag1_norm = mag1_db - mag1_db[idx_norm1]
-    mag2_norm = mag2_db - mag2_db[idx_norm2]
+    # 1. Aplicar normalización solo si normalizar=True
+    if normalizar:
+        idx_norm1 = np.argmin(np.abs(frec1 - f_norm))
+        idx_norm2 = np.argmin(np.abs(frec2 - f_norm))
+        
+        mag1_eval_base = mag1_db - mag1_db[idx_norm1]
+        mag2_eval_base = mag2_db - mag2_db[idx_norm2]
+    else:
+        mag1_eval_base = mag1_db
+        mag2_eval_base = mag2_db
     
     # 2. Filtrar la curva 1 dentro del rango [f_min, f_max]
     mask_rango = (frec1 >= f_min) & (frec1 <= f_max)
@@ -303,10 +350,10 @@ def diferencia_maxima_db(frec1, mag1_db, frec2, mag2_db, f_min=20, f_max=50, f_n
         raise ValueError(f"No hay puntos de la Curva 1 en el rango especificado ({f_min} Hz - {f_max} Hz).")
         
     frec1_eval = frec1[mask_rango]
-    mag1_eval = mag1_norm[mask_rango]
+    mag1_eval = mag1_eval_base[mask_rango]
     
     # 3. Interpolar la curva 2 sobre la grilla de frecuencias de la curva 1 en ese rango
-    mag2_interp = np.interp(frec1_eval, frec2, mag2_norm)
+    mag2_interp = np.interp(frec1_eval, frec2, mag2_eval_base)
     
     # 4. Diferencia punto a punto
     diferencias = np.abs(mag1_eval - mag2_interp)
@@ -317,7 +364,10 @@ def diferencia_maxima_db(frec1, mag1_db, frec2, mag2_db, f_min=20, f_max=50, f_n
     f_max_diff = frec1_eval[idx_max]
     max_diff = diferencias[idx_max]
     
+    # Reporte por consola
+    modo_str = f"Relativo (0 dB en {f_norm} Hz)" if normalizar else "Absoluto"
     print("--- Análisis de Diferencia Máxima ---")
+    print(f"Modo: {modo_str}")
     print(f"Rango analizado: {f_min} Hz a {f_max} Hz")
     print(f"Máxima diferencia: {max_diff:.2f} dB en {f_max_diff:.2f} Hz")
     
@@ -366,7 +416,8 @@ comparar_respuesta_db([frec_far, frec_suma_near_reescalado_BS],
                       etiquetas=["Campo lejano", "Campo cercano escalado + bafle"])
 
 frec_respuesta_final, mag_respuesta_final, fas_respuesta_final = importar_arta(r"stf\stf_respuesta_final_BIEN_HECHO.txt")
-graficar_respuesta_db_20k(frec_respuesta_final, mag_respuesta_final, fas_respuesta_final, titulo="RESPUESTA FINAL", tipo="relativo")
+fas_respuesta_final_combinada = combinar_fases(frec_respuesta_final, fas_respuesta_final, fas_far)
+graficar_respuesta_db_20k(frec_respuesta_final, mag_respuesta_final, fas_respuesta_final_combinada, titulo="RESPUESTA FINAL", tipo="relativo")
 
 frec_limp, mag_limp, fas_limp = importar_datos_limp(r"basta y limp\MEDICION IMPEDANCIA C7 VENTILADO.csv")
 frec_imp_basta, mag_imp_basta, fas_imp_basta =  importar_basta(r"basta y limp\electrical_impedance.txt")
@@ -374,7 +425,7 @@ frec_system_response, mag_system_response, fas_system_response = importar_basta(
 
 comparar_respuesta_db([frec_system_response, frec_respuesta_final], 
                       [mag_system_response, mag_respuesta_final], 
-                      [fas_system_response, fas_respuesta_final],
+                      [fas_system_response, fas_respuesta_final_combinada],
                       etiquetas=["Simulación en BASTA!", "Medición cuasianecóica"], tipo = "relativo")
 
 comparar_impedancias(
@@ -418,4 +469,14 @@ freq_dif4, db_dif4 = diferencia_maxima_db(
     mag2_db=mag_system_response, 
     f_min=300, 
     f_max=1000
+)
+
+freq_dif5, db_dif5 = diferencia_maxima_db(
+    frec1=frec_driver, 
+    mag1_db=mag_driver, 
+    frec2=frec_port_escalado, 
+    mag2_db=mag_port_escalado, 
+    f_min=150, 
+    f_max=800,
+    normalizar=False
 )
